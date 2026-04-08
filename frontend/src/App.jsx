@@ -2,6 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const POLL_MS = 2000;
 
+/** Avoids `Unexpected end of JSON input` when Vite proxy returns an empty body (backend down). */
+async function readJsonResponse(res) {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(
+      "Empty API response — Django is probably not reachable. Run: python manage.py runserver 8001 " +
+        "(or set VITE_PROXY_API to your Django URL and restart npm run dev)."
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Expected JSON (HTTP ${res.status}): ${text.slice(0, 160)}${text.length > 160 ? "…" : ""}`
+    );
+  }
+}
+
 function terminalClass(line) {
   if (/BLOCKED|Failed|ERROR|error/i.test(line)) return "text-red-400";
   if (/Completed|passed|✓/i.test(line)) return "text-emerald-400";
@@ -46,7 +64,7 @@ export default function App() {
           setSessionId(null);
           return;
         }
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (data.status && data.status !== lastStatusRef.current) {
           lastStatusRef.current = data.status;
           setStatus(data.status);
@@ -96,7 +114,7 @@ export default function App() {
     setErrorMessage("");
     lastStatusRef.current = null;
     setTerminalLines([]);
-    appendTerminal("[System] Session created — pipeline starting…");
+    appendTerminal("[System] Submitting session…");
 
     try {
       const res = await fetch("/api/sessions/", {
@@ -108,7 +126,7 @@ export default function App() {
           api_key: key,
         }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res);
       if (!res.ok) {
         appendTerminal(`[System] ${JSON.stringify(data)}`);
         setBusy(false);
@@ -116,7 +134,7 @@ export default function App() {
       }
       const sid = data.session_id;
       setSessionId(sid);
-      appendTerminal(`[System] session_id=${sid}`);
+      appendTerminal(`[System] Session created — session_id=${sid}`);
       appendTerminal("[System] Polling every 2s…");
 
       pollRef.current = setInterval(() => {
@@ -148,8 +166,12 @@ export default function App() {
         appendTerminal("[System] Session already absent.");
         setSessionId(null);
       } else {
-        const body = await res.json().catch(() => ({}));
-        appendTerminal(`[System] Wipe failed: ${JSON.stringify(body)}`);
+        try {
+          const body = await readJsonResponse(res);
+          appendTerminal(`[System] Wipe failed: ${JSON.stringify(body)}`);
+        } catch (e) {
+          appendTerminal(`[System] Wipe failed: HTTP ${res.status} — ${e.message}`);
+        }
       }
     } catch (e) {
       appendTerminal(`[System] Wipe error: ${e.message}`);

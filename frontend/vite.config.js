@@ -5,6 +5,8 @@ import { defineConfig } from "vite";
 //   npm run dev -- --port 3000
 //   FRONTEND_PORT=3000 npm run dev
 const devPort = Number(process.env.FRONTEND_PORT || 5173) || 5173;
+// Where Django runs. If you see "http proxy error", Django is down or on another port.
+const apiTarget = process.env.VITE_PROXY_API || "http://127.0.0.1:8001";
 
 export default defineConfig({
   plugins: [react()],
@@ -12,7 +14,7 @@ export default defineConfig({
     port: devPort,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8001",
+        target: apiTarget,
         changeOrigin: true,
       },
     },
