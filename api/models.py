@@ -32,6 +32,11 @@ class PromptSession(models.Model):
         default="",
         help_text="Set when status is Failed (never stores API keys).",
     )
+    pipeline_logs = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Append-only style log lines for live step-by-step UI (no API keys).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

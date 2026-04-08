@@ -39,8 +39,11 @@ export default function App() {
   const [terminalLines, setTerminalLines] = useState([]);
   const [busy, setBusy] = useState(false);
   const [wipeBusy, setWipeBusy] = useState(false);
+  const [stepSanitized, setStepSanitized] = useState("");
+  const [stepCloud, setStepCloud] = useState("");
 
   const lastStatusRef = useRef(null);
+  const lastServerLogsJsonRef = useRef("");
   const pollRef = useRef(null);
 
   const appendTerminal = useCallback((line) => {
@@ -68,23 +71,35 @@ export default function App() {
         if (data.status && data.status !== lastStatusRef.current) {
           lastStatusRef.current = data.status;
           setStatus(data.status);
-          appendTerminal(
-            `[${new Date().toLocaleTimeString()}] STATUS → ${data.status}`
-          );
         }
+
+        setStepSanitized(data.sanitized_prompt || "");
+        setStepCloud(data.cloud_response || "");
+
+        const serverLogs = Array.isArray(data.pipeline_logs)
+          ? data.pipeline_logs
+          : [];
+        const logsJson = JSON.stringify(serverLogs);
+        if (logsJson !== lastServerLogsJsonRef.current) {
+          lastServerLogsJsonRef.current = logsJson;
+          if (serverLogs.length > 0) {
+            setTerminalLines([
+              `[Live · ${data.status}] Step-by-step log from server:`,
+              "────────────────────────────────────────",
+              ...serverLogs,
+            ]);
+          }
+        }
+
         if (data.status === "Completed") {
           setFinalText(data.final_rehydrated_text || "");
           setErrorMessage("");
           stopPolling();
-          appendTerminal("[System] Pipeline finished successfully.");
           setBusy(false);
         } else if (data.status === "Failed") {
           setErrorMessage(data.error_message || "Unknown failure");
           setFinalText("");
           stopPolling();
-          appendTerminal(
-            `[System] Pipeline failed: ${data.error_message || "Unknown"}`
-          );
           setBusy(false);
         }
       } catch (e) {
@@ -113,6 +128,9 @@ export default function App() {
     setFinalText("");
     setErrorMessage("");
     lastStatusRef.current = null;
+    lastServerLogsJsonRef.current = "";
+    setStepSanitized("");
+    setStepCloud("");
     setTerminalLines([]);
     appendTerminal("[System] Submitting session…");
 
@@ -162,6 +180,9 @@ export default function App() {
         setSessionId(null);
         setStatus(null);
         lastStatusRef.current = null;
+        lastServerLogsJsonRef.current = "";
+        setStepSanitized("");
+        setStepCloud("");
       } else if (res.status === 404) {
         appendTerminal("[System] Session already absent.");
         setSessionId(null);
@@ -323,7 +344,7 @@ export default function App() {
                   </span>
                 )}
               </div>
-              <div className="h-64 overflow-y-auto rounded-lg border border-gray-800 bg-black p-4 font-mono text-xs leading-relaxed">
+              <div className="h-56 overflow-y-auto rounded-lg border border-gray-800 bg-black p-4 font-mono text-xs leading-relaxed">
                 {terminalLines.length === 0 ? (
                   <span className="text-gray-600">Waiting for input…</span>
                 ) : (
@@ -334,7 +355,41 @@ export default function App() {
                   ))
                 )}
               </div>
+              <p className="mt-1.5 text-xs text-gray-500">
+                Log lines are stored on the server and refresh every {POLL_MS / 1000}s
+                while the pipeline runs.
+              </p>
             </div>
+
+            {(stepSanitized || stepCloud) && (
+              <details className="rounded-lg border border-gray-800 bg-gray-900/40 open:bg-gray-900/60">
+                <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-300">
+                  Step outputs (what each stage produced)
+                </summary>
+                <div className="space-y-4 border-t border-gray-800 px-4 py-4">
+                  {stepSanitized && (
+                    <div>
+                      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-sovereign-400">
+                        After step 1 — sanitised prompt (sent to cloud)
+                      </div>
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-gray-800 bg-black/80 p-3 text-xs text-gray-300">
+                        {stepSanitized}
+                      </pre>
+                    </div>
+                  )}
+                  {stepCloud && (
+                    <div>
+                      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-400/90">
+                        After step 3 — raw cloud reply (before re-hydration)
+                      </div>
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-gray-800 bg-black/80 p-3 text-xs text-gray-300">
+                        {stepCloud}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
 
             {errorMessage && (
               <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-300">

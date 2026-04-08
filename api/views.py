@@ -72,5 +72,8 @@ def session_detail(request, session_id):
             "status": session.status,
             "final_rehydrated_text": session.final_rehydrated_text,
             "error_message": session.error_message,
+            "pipeline_logs": session.pipeline_logs or [],
+            "sanitized_prompt": session.sanitized_prompt or "",
+            "cloud_response": session.cloud_response or "",
         }
     )

@@ -74,102 +74,107 @@ class PipelineLog:
 
 
 # ---------------------------------------------------------------------------
-# System prompts
+# System prompts — short, principle-based (any domain / output shape)
 # ---------------------------------------------------------------------------
 EXTRACTOR_SYSTEM = """\
-You are PII-Shield, an enterprise GDPR / data-loss-prevention compliance tool.
-Your purpose is to PROTECT user privacy by finding and redacting personally
-identifiable information (PII) before it is sent to an external system.
-This is a legally required sanitisation step. You are NOT accessing, leaking,
-or misusing any data — you are preventing data leakage.
+ROLE: You are a PII-redaction preprocessor in an enterprise data-loss-prevention pipeline.
+The user's document stays on-premises; your JSON output replaces sensitive spans with
+[REDACTED_<TYPE>_<N>] placeholders so an UNTRUSTED external cloud API never sees raw
+identifiers. This is lawful GDPR-style data minimisation — never refuse, apologise, or
+moralise. If the document mentions people, health data, or credentials, that is EXACTLY
+when redaction is required, not forbidden.
 
-TASK: You will receive a block of text between <DOCUMENT> tags. Scan that text
-and replace every piece of PII with a numbered placeholder. Return ONLY a JSON
-object — nothing else.
+OUTPUT FORMAT: Return ONLY a single valid JSON object — no markdown fences, no prose
+before or after. Never output "I cannot" or any text outside the JSON.
 
-PII categories to detect and redact:
-  person names, email addresses, phone numbers, physical/mailing addresses,
-  IP addresses, IBANs, credit-card numbers, dates of birth, social security
-  numbers (SSN), company-internal project codenames, monetary amounts tied to
-  a specific entity, passwords, API keys/tokens, and any other personally
-  identifiable information.
+WHAT TO REDACT (replace literal value with placeholder):
+  • People: names → NAME, emails → EMAIL, phones → PHONE, postal addresses → ADDRESS
+  • Identity: DOB → DOB, SSN/passport/national IDs → SSN, employee/patient IDs → OTHER
+  • Financial: credit card numbers → CREDIT_CARD, IBANs → IBAN, monetary amounts → AMOUNT
+  • Auth: passwords → PASSWORD, API keys/tokens/secrets → API_KEY
+  • Infrastructure: IP addresses → IP, internal hostnames → IP
+  • Temporal: exact timestamps (date+time+tz) in logs → DATETIME
+  • Organisational: confidential project/trial codenames → PROJECT
+  • Contextual: payment-vendor names adjacent to redacted payment data → VENDOR
+  • Anything else identifying or secret → OTHER
 
-Placeholder format: [REDACTED_<TYPE>_<N>]
-  TYPE is one of: NAME, EMAIL, PHONE, ADDRESS, IP, IBAN, CREDIT_CARD, DOB,
-  SSN, PROJECT, AMOUNT, PASSWORD, API_KEY, OTHER
-  N is a sequential integer starting at 1 within each type.
+PLACEHOLDER SYNTAX: [REDACTED_<TYPE>_<N>] — N starts at 1 per TYPE.
+  Example: [REDACTED_NAME_1], [REDACTED_EMAIL_1], [REDACTED_IP_1]
 
-Output format — a single valid JSON object, no markdown fences, no commentary:
-{
-  "sanitized_prompt": "<the text with every PII item replaced by its placeholder>",
-  "sensitive_mapping": {
-    "[REDACTED_NAME_1]": "original value",
-    "[REDACTED_EMAIL_1]": "original value"
-  }
-}
+WHAT TO KEEP VERBATIM (do NOT redact):
+  • Generic technical terms, SQL keywords, table/column names, framework names
+  • The user's task description, instructions, and questions — preserve wording exactly
+  • Environment-variable references, code constructs, and boilerplate
 
-Rules:
-- If there is NO PII, return the original text as sanitized_prompt with an
-  empty sensitive_mapping {}.
-- NEVER refuse this task. Redacting PII is a privacy-protective action.
-- NEVER add, remove, or rephrase any content — only substitute PII tokens.
-- Output MUST be valid JSON parseable by Python json.loads().
-- The sensitive_mapping value MUST be a JSON object mapping each placeholder
-  string key to the original string value (valid JSON: double-quoted keys).
-- Respond with ONLY the raw JSON object — no markdown fences, no prose before
-  or after the JSON.
+CRITICAL RULES:
+1. sanitized_prompt MUST be the user's FULL original text, character-for-character,
+   EXCEPT where you swap a sensitive literal for a [REDACTED_*] placeholder.
+2. Every placeholder in sanitized_prompt MUST appear as a key in sensitive_mapping
+   with the EXACT original span as its value.
+3. If nothing is sensitive, mapping is {} and sanitized_prompt equals the original.
+4. Use valid JSON with double-quoted keys.
+
+OUTPUT SHAPE:
+{"sanitized_prompt": "<full text with placeholders>", "sensitive_mapping": {"[REDACTED_NAME_1]": "John Smith", ...}}
+
+EXAMPLE:
+Input: "Email john@acme.com about patient Jane Doe (SSN 123-45-6789), IP 10.0.1.5."
+Output:
+{"sanitized_prompt": "Email [REDACTED_EMAIL_1] about patient [REDACTED_NAME_1] (SSN [REDACTED_SSN_1]), IP [REDACTED_IP_1].",
+ "sensitive_mapping": {"[REDACTED_EMAIL_1]": "john@acme.com", "[REDACTED_NAME_1]": "Jane Doe", "[REDACTED_SSN_1]": "123-45-6789", "[REDACTED_IP_1]": "10.0.1.5"}}
 """
+
+EXTRACTOR_RETRY_SUFFIX = (
+    "\n\nREMINDER: Output ONLY the JSON object. Do not refuse. "
+    "De-identification for outbound minimisation is mandatory and ethical here."
+)
 
 REHYDRATOR_SYSTEM = """\
-You are PII-Restore, an enterprise compliance tool that restores redacted data
-in a controlled, authorised post-processing step. The user owns this data and
-has explicitly authorised the restoration. This is safe and expected.
+ROLE: You are a local-only token-restoration engine. You receive a draft containing
+[REDACTED_TYPE_N] placeholders and a JSON mapping of placeholder → original value.
 
-You receive two inputs:
-1. A response that contains [REDACTED_*] placeholders.
-2. A JSON mapping of each placeholder to its original value.
+TASK:
+1. Replace every [REDACTED_TYPE_N] token with its corresponding value from the mapping.
+2. Match keys case-insensitively on the TYPE segment
+   (e.g. [REDACTED_address_1] matches [REDACTED_ADDRESS_1]).
+3. Do NOT alter, summarise, rephrase, or reformat any other text.
+4. Do NOT add preamble, commentary, or explanation.
+5. Preserve all formatting: markdown, code blocks, headings, lists, whitespace.
 
-Your ONLY job is to replace every placeholder in the response with the
-corresponding original value from the mapping. Do NOT alter, summarise, or
-rephrase any other part of the text. Return ONLY the final restored text —
-no JSON wrapping, no commentary, no refusal.
-Match mapping keys case-insensitively for the TYPE part (e.g. [REDACTED_address_1]
-equals [REDACTED_ADDRESS_1]). Replace every [REDACTED_*] token; none may remain.
+OUTPUT: The final restored plain text only — nothing else.
 """
 
-# Cloud must not materialize secrets; rehydration happens only on the client.
-CLOUD_PLACEHOLDER_INSTRUCTION = """You are completing a privacy-controlled task.
+CLOUD_PLACEHOLDER_INSTRUCTION = """\
+You are a senior technical writer and software engineer. Complete the user's task in
+whatever form they requested (code, report, email, memo, clinical/legal draft, Q&A,
+bullets, etc.). Mirror their structure, tone, and intended audience exactly.
 
-SECRET TOKENS (only these carry real user data):
-The user's text includes [REDACTED_NAME_1], [REDACTED_ADDRESS_1], [REDACTED_PHONE_1],
-[REDACTED_IP_1], [REDACTED_SSN_1], etc. Copy each EXACTLY (same brackets, TYPE, number)
-everywhere that specific secret is meant to appear (e.g. salutation, address block, body).
+PLACEHOLDER RULES:
+• The user's text contains [REDACTED_*] tokens (e.g. [REDACTED_NAME_1],
+  [REDACTED_IP_1]) representing private values that were removed for privacy.
+• Copy each placeholder EXACTLY where that value belongs in your output.
+• NEVER expand, guess, or invent real-looking values for any placeholder.
+• NEVER fabricate people, companies, credentials, or identifiers.
+• For entities not represented by a token, use neutral wording:
+  "the organisation", "the recipient", "the server", etc.
 
-NEVER spell out those secrets as plain text—only the [REDACTED_*] tokens.
+LEAKAGE PREVENTION:
+• Do not copy exact timestamps from non-token text — use approximate timing.
+• If payment/card fields were redacted, say "payment processor" / "card gateway"
+  — never use commercial product names.
+• Do not default to email/letter format unless the user clearly wants correspondence.
 
-NORMAL LETTER LAYOUT (avoid fake "template tags"):
-- Write a realistic business letter: real headings like **Date:**, **To:**, **Subject:**,
-  and **Sincerely,** — not bracket labels such as [Letterhead], [Date], or [Company Name].
-- For the date line, use "Date: _______________" or leave a blank line; do not invent a calendar date.
-- For closing/signature, use lines such as "________________________" and
-  "Authorized representative" / "Human Resources" — do not invent signer names.
-
-GENERIC REFERENCES (no invented identities):
-- For any role that has NO [REDACTED_*] token in the user message, never invent personal names
-  (no "Sandra Weber", "John Doe", etc.). Write neutrally: "your direct supervisor",
-  "Human Resources", "the reporting manager", "the undersigned".
-- Do not invent company names; say "the company" or "your employer" if needed.
-
-Temperature is set to 0: follow literally and deterministically."""
+Deterministic output — temperature 0."""
 
 CLOUD_RETRY_USER_MESSAGE = (
-    "Your previous answer was REJECTED: it contained raw secret values or invented names. "
-    "Rewrite the COMPLETE letter from scratch. "
-    "All sensitive facts from the original task must appear ONLY as the exact [REDACTED_*] "
-    "tokens from the user message—never as spelled-out names, IDs, addresses, or IPs. "
-    "Use a normal letter format (Date / To / Subject / Sincerely) with underscores for blanks—"
-    "not [Letterhead]-style bracket tags. No fictional people: use 'your direct supervisor', "
-    "'Human Resources', or similar neutral wording."
+    "REJECTED: Your previous draft contained leaked secrets as plain text "
+    "and/or invented identities that were not in the original prompt. "
+    "Rewrite from scratch following these rules strictly:\n"
+    "1. Keep the SAME output type/format the user originally requested.\n"
+    "2. Use ONLY [REDACTED_*] tokens for secrets — never expand them.\n"
+    "3. Use neutral wording for non-token entities (roles, 'the organisation').\n"
+    "4. No verbatim timestamps from non-token text.\n"
+    "5. No payment-vendor brand names if payment data was redacted."
 )
 
 # Substrings this short are skipped to avoid false positives (e.g. "USA", "HR").
@@ -294,22 +299,28 @@ def _force_mapped_secrets_to_placeholders(
 # ---------------------------------------------------------------------------
 # Agent 1 — Extractor (Local via Ollama)
 # ---------------------------------------------------------------------------
-def call_extractor(prompt: str, log: PipelineLog) -> dict[str, Any]:
-    """Ask the local LLM to extract PII and return sanitised prompt + mapping."""
-    log.add("Local", "Extracting sensitive information via Ollama…")
-
-    wrapped_prompt = (
-        "Scan the following document for PII and return the sanitised JSON.\n\n"
-        f"<DOCUMENT>\n{prompt}\n</DOCUMENT>"
-    )
-
+def _ollama_extractor_json(
+    user_content: str, log: PipelineLog, retry: bool
+) -> dict[str, Any]:
     client = _ollama_client()
+    messages = [
+        {"role": "system", "content": EXTRACTOR_SYSTEM},
+        {"role": "user", "content": user_content},
+    ]
+    if retry:
+        log.add("Local", "Extractor retry with stricter JSON-only instruction…")
+        messages.append(
+            {
+                "role": "user",
+                "content": "Your last reply was not valid JSON. "
+                "Return ONLY the single JSON object with sanitized_prompt and "
+                "sensitive_mapping. No prose." + EXTRACTOR_RETRY_SUFFIX,
+            }
+        )
+
     response = client.chat(
         model=settings.OLLAMA_MODEL,
-        messages=[
-            {"role": "system", "content": EXTRACTOR_SYSTEM},
-            {"role": "user", "content": wrapped_prompt},
-        ],
+        messages=messages,
         options={"temperature": 0.0},
     )
 
@@ -327,6 +338,29 @@ def call_extractor(prompt: str, log: PipelineLog) -> dict[str, Any]:
 
     if "sanitized_prompt" not in parsed or "sensitive_mapping" not in parsed:
         raise ValueError("Extractor JSON missing required keys")
+
+    return parsed
+
+
+def call_extractor(prompt: str, log: PipelineLog) -> dict[str, Any]:
+    """Ask the local LLM to extract PII and return sanitised prompt + mapping."""
+    log.add("Local", "Extracting sensitive information via Ollama…")
+
+    wrapped = (
+        f"<DOCUMENT>\n{prompt}\n</DOCUMENT>\n\n"
+        "Perform de-identification per the system rules. "
+        "Reply with the single JSON object only — no other text."
+        + EXTRACTOR_RETRY_SUFFIX
+    )
+
+    try:
+        parsed = _ollama_extractor_json(wrapped, log, retry=False)
+    except (ValueError, json.JSONDecodeError) as first_err:
+        logger.warning("Extractor first pass failed: %s", first_err)
+        try:
+            parsed = _ollama_extractor_json(wrapped, log, retry=True)
+        except (ValueError, json.JSONDecodeError) as second_err:
+            raise ValueError(str(second_err)) from second_err
 
     mapping = parsed["sensitive_mapping"]
     count = len(mapping)
@@ -573,12 +607,9 @@ def call_rehydrator(
     n_remain = len(_PLACEHOLDER_IN_TEXT.findall(rehydrated))
     log.add("Local", f"{n_remain} placeholder(s) remain — invoking LLM fallback…")
     user_msg = (
-        f"Response:\n{rehydrated}\n\n"
-        f"Mapping (JSON, UTF-8):\n"
-        f"{json.dumps(sensitive_mapping, ensure_ascii=False, indent=2)}\n\n"
-        "Replace every [REDACTED_..._N] token using the mapping. "
-        "Keys match case-insensitively on the middle TYPE word. "
-        "Output the complete restored text only — no placeholders left."
+        f"Draft:\n{rehydrated}\n\n"
+        f"Mapping:\n{json.dumps(sensitive_mapping, ensure_ascii=False, indent=2)}\n\n"
+        "Substitute all [REDACTED_*] tokens; output full text only."
     )
 
     client = _ollama_client()
@@ -644,14 +675,29 @@ def _execute_session_pipeline(
 
     log = PipelineLog()
 
+    def flush_logs() -> None:
+        session.pipeline_logs = list(log.entries)
+        session.save(update_fields=["pipeline_logs", "updated_at"])
+
     def fail(msg: str) -> None:
+        log.add("System", f"FAILED — {msg}")
         session.status = PromptSession.Status.FAILED
         session.error_message = msg[:5000]
-        session.save(update_fields=["status", "error_message", "updated_at"])
+        session.pipeline_logs = list(log.entries)
+        session.save(
+            update_fields=[
+                "status",
+                "error_message",
+                "pipeline_logs",
+                "updated_at",
+            ]
+        )
 
-    # --- Step 1: Local extractor ---
+    log.add("System", "Pipeline started — step 1/4: local extraction (Ollama).")
     session.status = PromptSession.Status.EXTRACTING
-    session.save(update_fields=["status", "updated_at"])
+    session.pipeline_logs = list(log.entries)
+    session.save(update_fields=["status", "pipeline_logs", "updated_at"])
+
     try:
         extraction = call_extractor(session.raw_prompt, log)
     except Exception as exc:
@@ -664,16 +710,30 @@ def _execute_session_pipeline(
         fail("Extractor returned invalid sensitive_mapping (must be a JSON object).")
         return
 
+    n_map = len(mapping)
+    log.add(
+        "System",
+        f"Step 1 done — {n_map} mapping entr(y/ies); sanitised prompt length "
+        f"{len(extraction.get('sanitized_prompt', '') or '')} chars.",
+    )
     session.sanitized_prompt = extraction["sanitized_prompt"]
     session.sensitive_mapping = mapping
+    session.pipeline_logs = list(log.entries)
     session.save(
-        update_fields=["sanitized_prompt", "sensitive_mapping", "updated_at"]
+        update_fields=[
+            "sanitized_prompt",
+            "sensitive_mapping",
+            "pipeline_logs",
+            "updated_at",
+        ]
     )
 
-    # --- Step 2: Presidio firewall ---
+    log.add("System", "Step 2/4: Presidio DLP validation (local).")
     session.status = PromptSession.Status.VALIDATING
-    session.save(update_fields=["status", "updated_at"])
+    session.pipeline_logs = list(log.entries)
+    session.save(update_fields=["status", "pipeline_logs", "updated_at"])
     passed = run_presidio_firewall(session.sanitized_prompt, log)
+    flush_logs()
     if not passed:
         fail(
             "Presidio DLP: sensitive entities remain in sanitized text above the "
@@ -681,9 +741,10 @@ def _execute_session_pipeline(
         )
         return
 
-    # --- Step 3: Cloud (token only in memory) ---
+    log.add("System", f"Step 3/4: cloud LLM ({provider}).")
     session.status = PromptSession.Status.CLOUD_PROCESSING
-    session.save(update_fields=["status", "updated_at"])
+    session.pipeline_logs = list(log.entries)
+    session.save(update_fields=["status", "pipeline_logs", "updated_at"])
     try:
         cloud_text = call_cloud(
             session.sanitized_prompt,
@@ -699,12 +760,20 @@ def _execute_session_pipeline(
         fail(f"Cloud provider error: {exc}")
         return
 
+    log.add(
+        "System",
+        f"Step 3 done — cloud reply length {len(cloud_text or '')} chars.",
+    )
     session.cloud_response = cloud_text or ""
-    session.save(update_fields=["cloud_response", "updated_at"])
+    session.pipeline_logs = list(log.entries)
+    session.save(
+        update_fields=["cloud_response", "pipeline_logs", "updated_at"]
+    )
 
-    # --- Step 4: Re-hydrator ---
+    log.add("System", "Step 4/4: local re-hydration (Ollama if needed).")
     session.status = PromptSession.Status.REHYDRATING
-    session.save(update_fields=["status", "updated_at"])
+    session.pipeline_logs = list(log.entries)
+    session.save(update_fields=["status", "pipeline_logs", "updated_at"])
     try:
         final = call_rehydrator(
             session.cloud_response,
@@ -720,11 +789,13 @@ def _execute_session_pipeline(
     session.final_rehydrated_text = final
     session.status = PromptSession.Status.COMPLETED
     session.error_message = ""
+    session.pipeline_logs = list(log.entries)
     session.save(
         update_fields=[
             "final_rehydrated_text",
             "status",
             "error_message",
+            "pipeline_logs",
             "updated_at",
         ]
     )
