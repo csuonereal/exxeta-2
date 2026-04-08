@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  middleware:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      # host.docker.internal allows docker to talk to localhost on the host machine
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      # Define your API keys here
+      # - OPENAI_API_KEY=your-key
+      # - GEMINI_API_KEY=your-key
+      # - ANTHROPIC_API_KEY=your-key
+    volumes:
+      - ./compliance_middleware.db:/app/compliance_middleware.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

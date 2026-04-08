@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance-Aware Orchestrator</title>
+    <!-- Fonts for elegant modern style -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="glass-panel">
+            <div class="logo">
+                <span class="shield-icon">🛡️</span> 
+                <h1>Compliance-Aware <span>AI Orchestrator</span></h1>
+            </div>
+            <div class="status-badge" id="backendStatus">Connecting...</div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            
+            <!-- Left Column: Input -->
+            <section class="input-section glass-panel">
+                <h2>1. Input Submission</h2>
+                <p class="subtitle">Submit text or upload documents to the orchestration middleware.</p>
+                
+                <form id="processForm">
+                    <div class="form-group">
+                        <label for="taskInput">Task</label>
+                        <input type="text" id="taskInput" placeholder="e.g., Summarize this meeting" value="Extract key action items and summarize risk." required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contentInput">Data / Context</label>
+                        <textarea id="contentInput" rows="8" placeholder="Paste sensitive text, emails, etc. here..." required>To: compliance-team@corp.com
+From: john.doe@securebank.com
+Subject: Project Phoenix Delays
+
+Hi team, we need to report that customer Jane Smith (SSN: 000-00-0000) has requested a full GDPR deletion. Also, the Q3 revenues from the EU branch leaked inadvertently by Michael Bolton to public forums. Please advise.</textarea>
+                    </div>
+                    
+                    <button type="submit" id="submitBtn" class="btn primary-btn">
+                        <span>Process Payload</span>
+                        <div class="loader-spinner" style="display:none;"></div>
+                    </button>
+                    
+                    <button type="button" id="mockEmailBtn" class="btn secondary-btn">
+                        Load Sample Sensitive Email
+                    </button>
+                </form>
+            </section>
+
+            <!-- Center Column: Visual Pipeline representation -->
+            <section class="pipeline-section">
+                <h2>Live Routing Pipeline</h2>
+                
+                <div class="pipeline-card" id="step1">
+                    <div class="icon">🔍</div>
+                    <div class="details">
+                        <h3>SRD Detection Layer</h3>
+                        <p id="srdResult">Waiting...</p>
+                    </div>
+                </div>
+
+                <div class="pipeline-connection"></div>
+
+                <div class="pipeline-card" id="step2">
+                    <div class="icon">🚦</div>
+                    <div class="details">
+                        <h3>Policy & Risk Router</h3>
+                        <p id="routeResult">Waiting...</p>
+                    </div>
+                </div>
+
+                <div class="pipeline-connection"></div>
+
+                <div class="pipeline-card" id="step3">
+                    <div class="icon">🧠</div>
+                    <div class="details">
+                        <h3>Model Gateway</h3>
+                        <p id="modelResult">Waiting...</p>
+                    </div>
+                </div>
+
+                <div class="pipeline-connection"></div>
+
+                <div class="pipeline-card" id="step4">
+                    <div class="icon">⚖️</div>
+                    <div class="details">
+                        <h3>Judge Verification</h3>
+                        <p id="judgeResult">Waiting...</p>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Right Column: Final Output & Feedback -->
+            <section class="output-section glass-panel">
+                <h2>Final Output</h2>
+                
+                <div class="output-box" id="finalOutput">
+                    Results will appear here securely...
+                </div>
+
+                <div class="audit-metadata">
+                    <div class="meta-item">
+                        <span class="meta-label">Risk Level:</span>
+                        <span class="meta-value" id="riskBadge">-</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Route Taken:</span>
+                        <span class="meta-value" id="routeText">-</span>
+                    </div>
+                </div>
+
+                <div class="feedback-widget" id="feedbackWidget" style="display: none;">
+                    <h3>Verify Output Status</h3>
+                    <p>Judge says: <strong id="judgeVerdict">-</strong></p>
+                    <p id="judgeReason" class="text-sm"></p>
+                    
+                    <div class="feedback-actions">
+                        <p>Was this helpful?</p>
+                        <button class="feedback-btn" data-rating="UP">👍</button>
+                        <button class="feedback-btn" data-rating="DOWN">👎</button>
+                    </div>
+                    <p id="feedbackThanks" style="display:none; color: green; font-weight:600; margin-top: 10px;">Feedback logged securely.</p>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
