@@ -45,7 +45,7 @@ class OrchestratorService:
         yield format_event("abstract", "Abstracting Entities...", "")
         abstracted_text, mapping = AbstractorService.abstract_text(raw_text, entities)
         
-        masked_details = ", ".join([v for k, v in mapping.items()]) if mapping else "None detected."
+        masked_details = ", ".join([f"{v['value']} ({v['type']})" for k, v in mapping.items()]) if mapping else "None detected."
         yield format_event("abstract_done", "Anonymizing Privacy Data", f"Instances removed & abstracted: {masked_details}")
         
         # 4. Policy & Routing

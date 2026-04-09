@@ -25,8 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // Give Admin full provider list plus capability to add new ones
             modelSelect.innerHTML = `
                 <option value="auto">LLM: Auto (Risk-based)</option>
-                <option value="gemini" selected>LLM: Gemini (Secure API)</option>
-                <option value="openai">LLM: OpenAI (Secure API)</option>
+                <option value="openai" selected>LLM: OpenAI (Secure API)</option>
+                <option value="gemini">LLM: Gemini (Secure API)</option>
                 <option value="local">LLM: Local (Ollama GPU)</option>
             `;
             // Quick mock event listener for adding provider
@@ -46,17 +46,16 @@ document.addEventListener("DOMContentLoaded", () => {
             
             // Standard User sees typical models. They do not know a router intercepts them if SRDs are found.
             modelSelect.innerHTML = `
-                <option value="gemini" selected>LLM: Google Gemini</option>
-                <option value="openai">LLM: OpenAI</option>
+                <option value="openai" selected>LLM: OpenAI</option>
+                <option value="gemini">LLM: Google Gemini</option>
                 <option value="anthropic">LLM: Anthropic</option>
                 <option value="local">LLM: Local Engine</option>
             `;
-            
+        }    
             // Clean state to ensure Admin-only files are not unintentionally leaked upon logout
             if (activeFileName === "SYSTEM_Intercept_Logs.json") {
                 activeFileName = "Q3_Variance_Report.txt";
             }
-        }
         
         if (typeof renderFileList === "function") {
             document.getElementById('settingsConsole').style.display = 'none';
@@ -609,61 +608,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch(err) {}
             });
         });
-        
-        // Audio Read Aloud Capability (Backend API TTS)
-        const readAloudBtn = document.createElement('button');
-        readAloudBtn.className = "feedback-btn";
-        readAloudBtn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
-        readAloudBtn.title = "Generate Audio Response";
-        readAloudBtn.style.marginRight = "auto"; 
-        
-        let currentAudio = null;
-        
-        readAloudBtn.onclick = async (e) => {
-            const btn = e.currentTarget;
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
-                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
-                btn.style.color = "inherit";
-                return;
-            }
-            
-            btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Loading...</span>`;
-            
-            try {
-                const formData = new FormData();
-                formData.append("text", outputText);
-                
-                const voiceSelect = document.getElementById('voiceSelect');
-                const provider = voiceSelect ? voiceSelect.value : "mistral";
-                formData.append("provider", provider); 
-                
-                const response = await fetch('/api/audio/tts', { method: 'POST', body: formData });
-                if (!response.ok) {
-                    const r = await response.json();
-                    throw new Error(r.detail || "API Failure");
-                }
-                
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                currentAudio = new Audio(url);
-                currentAudio.onended = () => {
-                    btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
-                    btn.style.color = "inherit";
-                    currentAudio = null;
-                };
-                
-                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Playing...</span>`;
-                btn.style.color = "var(--accent)";
-                currentAudio.play();
-                
-            } catch(err) {
-                alert("TTS Error: " + err.message);
-                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
-            }
-        };
-        widgetWrapper.querySelector('.feedback-actions').prepend(readAloudBtn);
 
         messageDiv.querySelector('.bubble').appendChild(widgetWrapper);
         scrollToBottom();
