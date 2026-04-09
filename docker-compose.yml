@@ -16,6 +16,11 @@ services:
       - OLLAMA_JUDGE_MODEL=llama3.2
       - OLLAMA_ROUTING_MODEL=llama3.2
       # SQLite on a writable dir (avoid bind-mounting a single file: missing host path → dir → sqlite fails)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - DATABASE_URL=sqlite:////app/data/compliance_middleware.db
     volumes:
       - middleware_data:/app/data
