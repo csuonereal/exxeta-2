@@ -1,45 +1,56 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from app.db.engine import get_db
+from app.db.engine import SessionLocal # Using SessionLocal directly for background commit
 from app.db.models import AuditLog, Feedback
 from app.schemas.requests import ProcessRequest, FeedbackRequest
 from app.schemas.responses import ProcessResponse, AuditLogResponse, JudgeDetails
 from app.services.orchestrator import OrchestratorService
+import json
 
 router = APIRouter()
 orchestrator = OrchestratorService()
 
-@router.post("/process", response_model=ProcessResponse)
-async def process_task(request: ProcessRequest, db: Session = Depends(get_db)):
+def get_db():
+    db = SessionLocal()
     try:
-        # Run the full orchestrator pipeline
-        result = await orchestrator.run_pipeline(request)
-        
-        # Asynchronously or synchronously insert to Audit Log DB
-        new_log = AuditLog(
-            input_hash=result["input_hash"],
-            risk_level=result["risk_level"],
-            route_decision=result["route"],
-            explanation=result["explanation"],
-            srd_count=result["srd_count"],
-            model_used=result["model_used"],
-            judge_status=result["judge"].get("status", "UNKNOWN")
-        )
-        db.add(new_log)
-        db.commit()
-        db.refresh(new_log)
-        
-        # Format response
-        return ProcessResponse(
-            output=result["output"],
-            risk_level=result["risk_level"],
-            route=result["route"],
-            explanation=result["explanation"],
-            judge=JudgeDetails(**result["judge"]),
-            srd_count=result["srd_count"]
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        yield db
+    finally:
+        db.close()
+
+@router.post("/process")
+async def process_task(request: ProcessRequest):
+    async def sse_event_generator():
+        try:
+            async for chunk in orchestrator.run_pipeline_stream(request):
+                yield chunk
+                # Intercept the 'complete' chunk to log into DB asynchronously
+                if chunk.startswith("data: {\"step\": \"complete\""):
+                    payload = json.loads(chunk[len("data: "):])
+                    # Save DB log safely
+                    db = SessionLocal()
+                    try:
+                        new_log = AuditLog(
+                            input_hash=payload["input_hash"],
+                            risk_level=payload["risk_level"],
+                            route_decision=payload["route"],
+                            explanation=payload["explanation"],
+                            srd_count=payload["srd_count"],
+                            model_used=payload["model_used"],
+                            judge_status=payload["judge"].get("status", "UNKNOWN")
+                        )
+                        db.add(new_log)
+                        db.commit()
+                        db.refresh(new_log)
+                    except Exception as e:
+                        print(f"Error saving audit log: {e}")
+                    finally:
+                        db.close()
+        except Exception as e:
+            # Yield error event
+            yield f"data: {json.dumps({'step': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
 
 
 @router.post("/feedback")

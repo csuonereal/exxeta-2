@@ -3,135 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compliance-Aware Orchestrator</title>
-    <!-- Fonts for elegant modern style -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>Enterprise OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="glass-panel">
-            <div class="logo">
-                <span class="shield-icon">🛡️</span> 
-                <h1>Compliance-Aware <span>AI Orchestrator</span></h1>
+    
+    <!-- AUTHENTICATION SCREEN -->
+    <div id="authScreen" class="auth-layout">
+        <div class="auth-glass glass-panel">
+            <div class="auth-header">
+                <span class="shield-icon" style="font-size:3.5rem;">💠</span>
+                <h1>SecureBank <span>OS Workspace</span></h1>
+                <p>Select your assigned persona profile to log in</p>
             </div>
-            <div class="status-badge" id="backendStatus">Connecting...</div>
-        </header>
-
-        <!-- Main Workspace -->
-        <main class="workspace">
+            <div class="persona-cards">
+                <!-- Admin Persona -->
+                <div class="persona-card" onclick="loginAs('admin')">
+                    <div class="p-avatar" style="background: rgba(79, 70, 229, 0.1); color: var(--accent);">🛡️</div>
+                    <div>
+                        <h3>Alex</h3>
+                        <p>Compliance Officer</p>
+                        <span class="p-badge admin-badge">Admin Access</span>
+                    </div>
+                </div>
+                <!-- Standard Persona -->
+                <div class="persona-card" onclick="loginAs('standard')">
+                    <div class="p-avatar" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">💼</div>
+                    <div>
+                        <h3>Jordan</h3>
+                        <p>Sales Rep</p>
+                        <span class="p-badge standard-badge">Restricted Access</span>
+                    </div>
+                </div>
+            </div>
             
-            <!-- Left Column: Input -->
-            <section class="input-section glass-panel">
-                <h2>1. Input Submission</h2>
-                <p class="subtitle">Submit text or upload documents to the orchestration middleware.</p>
-                
-                <form id="processForm">
-                    <div class="form-group">
-                        <label for="taskInput">Task</label>
-                        <input type="text" id="taskInput" placeholder="e.g., Summarize this meeting" value="Extract key action items and summarize risk." required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="contentInput">Data / Context</label>
-                        <textarea id="contentInput" rows="8" placeholder="Paste sensitive text, emails, etc. here..." required>To: compliance-team@corp.com
-From: john.doe@securebank.com
-Subject: Project Phoenix Delays
-
-Hi team, we need to report that customer Jane Smith (SSN: 000-00-0000) has requested a full GDPR deletion. Also, the Q3 revenues from the EU branch leaked inadvertently by Michael Bolton to public forums. Please advise.</textarea>
-                    </div>
-                    
-                    <button type="submit" id="submitBtn" class="btn primary-btn">
-                        <span>Process Payload</span>
-                        <div class="loader-spinner" style="display:none;"></div>
-                    </button>
-                    
-                    <button type="button" id="mockEmailBtn" class="btn secondary-btn">
-                        Load Sample Sensitive Email
-                    </button>
-                </form>
-            </section>
-
-            <!-- Center Column: Visual Pipeline representation -->
-            <section class="pipeline-section">
-                <h2>Live Routing Pipeline</h2>
-                
-                <div class="pipeline-card" id="step1">
-                    <div class="icon">🔍</div>
-                    <div class="details">
-                        <h3>SRD Detection Layer</h3>
-                        <p id="srdResult">Waiting...</p>
-                    </div>
-                </div>
-
-                <div class="pipeline-connection"></div>
-
-                <div class="pipeline-card" id="step2">
-                    <div class="icon">🚦</div>
-                    <div class="details">
-                        <h3>Policy & Risk Router</h3>
-                        <p id="routeResult">Waiting...</p>
-                    </div>
-                </div>
-
-                <div class="pipeline-connection"></div>
-
-                <div class="pipeline-card" id="step3">
-                    <div class="icon">🧠</div>
-                    <div class="details">
-                        <h3>Model Gateway</h3>
-                        <p id="modelResult">Waiting...</p>
-                    </div>
-                </div>
-
-                <div class="pipeline-connection"></div>
-
-                <div class="pipeline-card" id="step4">
-                    <div class="icon">⚖️</div>
-                    <div class="details">
-                        <h3>Judge Verification</h3>
-                        <p id="judgeResult">Waiting...</p>
-                    </div>
-                </div>
-
-            </section>
-
-            <!-- Right Column: Final Output & Feedback -->
-            <section class="output-section glass-panel">
-                <h2>Final Output</h2>
-                
-                <div class="output-box" id="finalOutput">
-                    Results will appear here securely...
-                </div>
-
-                <div class="audit-metadata">
-                    <div class="meta-item">
-                        <span class="meta-label">Risk Level:</span>
-                        <span class="meta-value" id="riskBadge">-</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Route Taken:</span>
-                        <span class="meta-value" id="routeText">-</span>
-                    </div>
-                </div>
-
-                <div class="feedback-widget" id="feedbackWidget" style="display: none;">
-                    <h3>Verify Output Status</h3>
-                    <p>Judge says: <strong id="judgeVerdict">-</strong></p>
-                    <p id="judgeReason" class="text-sm"></p>
-                    
-                    <div class="feedback-actions">
-                        <p>Was this helpful?</p>
-                        <button class="feedback-btn" data-rating="UP">👍</button>
-                        <button class="feedback-btn" data-rating="DOWN">👎</button>
-                    </div>
-                    <p id="feedbackThanks" style="display:none; color: green; font-weight:600; margin-top: 10px;">Feedback logged securely.</p>
-                </div>
-
-            </section>
-        </main>
+            <div class="auth-form-mock">
+                <span>Or sign in with SSO</span>
+                <input type="email" placeholder="name@securebank.com" disabled>
+                <button disabled>Continue with SAML</button>
+            </div>
+        </div>
     </div>
+
+
+    <!-- MAIN OS WORKSPACE -->
+    <div id="osScreen" class="os-layout" style="display: none;">
+        
+        <!-- TOP NAV BAR -->
+        <nav class="top-nav glass-panel">
+            <div class="nav-left">
+                <span class="shield-icon">💠</span> 
+                <h2>SecureBank <span>OS</span></h2>
+            </div>
+            <div class="nav-center">
+                <input type="text" class="search-bar" placeholder="Search enterprise directories...">
+            </div>
+            <div class="nav-right" id="authSection">
+                <span class="user-persona" id="navPersonaDisplay">User Details</span>
+                <button id="logoutBtn" class="primary-btn sm">Log out</button>
+            </div>
+        </nav>
+
+        <div class="app-layout">
+            
+            <!-- FAR LEFT ACTIVITY BAR -->
+            <div class="activity-bar glass-panel">
+                <button class="activity-btn active" title="Local Drive">📁</button>
+                <button class="activity-btn" title="Email Inbox">📧</button>
+                <button class="activity-btn admin-only" title="Model Configuration">🧠</button>
+                <button class="activity-btn" style="margin-top:auto;" title="Settings">⚙️</button>
+            </div>
+
+            <!-- WORKSPACE PANEL -->
+            <div class="workspace">
+                
+                <!-- File Explorer -->
+                <aside class="file-explorer glass-panel">
+                    <div class="explorer-header">
+                        <h3>WORKSPACE</h3>
+                        <button id="addFileBtn" class="icon-btn admin-only" title="New File">＋</button>
+                    </div>
+                    <div class="explorer-label" id="explorerViewLabel">Local Drive</div>
+                    <!-- DRAG N DROP FILE LIST -->
+                    <ul id="fileList" class="file-list"></ul>
+                </aside>
+
+                <!-- Core Main Editor -->
+                <main class="editor-pane glass-panel" style="position:relative;">
+                    <div class="editor-header">
+                        <div class="editor-title">
+                            <span class="file-icon">📄</span>
+                            <input type="text" id="editorTitleInput" readonly>
+                        </div>
+                        <button id="deleteFileBtn" class="icon-btn danger-btn admin-only" title="Delete File" style="display:none;">🗑️</button>
+                    </div>
+                    
+                    <div class="editor-content">
+                        <textarea id="mainEditor" spellcheck="false" placeholder="Select a file to view..."></textarea>
+                    </div>
+
+                    <!-- Proposed Edit Overlay -->
+                    <div id="proposalOverlay" class="proposal-overlay" style="display:none;">
+                        <div class="proposal-header">
+                            <h4>✨ AI Suggested Edit</h4>
+                            <div class="proposal-actions">
+                                <button id="acceptEditBtn" class="primary-btn sm success">Accept</button>
+                                <button id="rejectEditBtn" class="danger-btn sm">Reject</button>
+                            </div>
+                        </div>
+                        <div class="proposal-diff">
+                            <textarea id="proposedEditor" spellcheck="false" readonly></textarea>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- AGENT SIDEBAR -->
+            <aside class="chat-sidebar glass-panel">
+                <header>
+                    <div class="logo">
+                        <span class="shield-icon">🛡️</span> 
+                        <h1>Compliance <span>AI</span></h1>
+                    </div>
+                    <div class="status-badge" title="Live Pipeline Active">Live</div>
+                </header>
+
+                <div class="chat-container" id="chatWindow">
+                    <!-- Chat loads dynamically -->
+                </div>
+
+                <!-- Chat Input Section -->
+                <div class="chat-input-wrapper" id="dropZone">
+                    
+                    <!-- Advanced Controls (Model & Audio selection) -->
+                    <div class="chat-controls" id="adminAgentControls">
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <select id="modelSelect" class="model-dropdown">
+                                <!-- Populated dynamically by app.js based on role -->
+                            </select>
+                            <button id="addProviderBtn" class="admin-only" title="Add new custom provider" style="cursor:pointer; border:none; background:transparent; font-size:1.1rem; color:var(--text-secondary);">⚙️</button>
+                        </div>
+                        <select id="voiceSelect" class="model-dropdown admin-only">
+                            <option value="local">Voice: Local (Whisper)</option>
+                            <option value="elevenlabs">Voice: ElevenLabs API</option>
+                            <option value="openai_tts">Voice: OpenAI TTS</option>
+                        </select>
+                    </div>
+
+                    <!-- Explicit Attachment Display -->
+                    <div class="attachment-preview" id="attachmentPreview" style="display: none;">
+                        <span id="attachedFileName">file.txt</span>
+                        <button id="removeAttachmentBtn">✕</button>
+                    </div>
+
+                    <!-- Input form -->
+                    <form id="chatForm">
+                        <label for="fileAttachment" class="attach-btn" title="Click to upload">
+                            ＋
+                            <input type="file" id="fileAttachment" accept=".txt,.pdf,.csv,.json" style="display: none;">
+                        </label>
+                        
+                        <!-- NEW MIC BUTTON -->
+                        <button type="button" class="mic-btn" id="micBtn" title="Hold to dictate">🎤</button>
+
+                        <textarea id="chatInput" placeholder="Ask AI... (Drop files from workspace here)" rows="1" required></textarea>
+                        
+                        <button type="submit" id="sendBtn" class="send-btn" title="Send Request">
+                            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </form>
+                    <div class="context-hint admin-only">Admin Context: Directly overwriting Workspace allowed</div>
+                    <div class="context-hint standard-only" style="display:none;">Context implicitly scoped to OS View</div>
+                </div>
+            </aside>
+
+        </div>
+    </div>
+
+    <!-- Template for Feedback Widget -->
+    <template id="feedbackTemplate">
+        <div class="feedback-widget">
+            <div class="judge-alert" style="display: none;">
+                <span class="judge-icon">⚠️</span> <strong class="judge-verdict"></strong> - <span class="judge-reason"></span>
+            </div>
+            <div class="feedback-actions admin-only">
+                <button class="feedback-btn upvote">👍</button>
+                <button class="feedback-btn downvote">👎</button>
+                <span class="feedback-thanks" style="display:none; color: var(--success); font-weight:600; font-size:0.8rem; margin-left: 10px;">Recorded!</span>
+            </div>
+        </div>
+    </template>
 
     <script src="/app.js"></script>
 </body>
