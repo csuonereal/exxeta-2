@@ -1,19 +1,26 @@
 version: '3.8'
 
 services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: always
+
   middleware:
     build: .
     ports:
       - "8000:8000"
     environment:
       - DEBUG=True
-      # host.docker.internal allows docker to talk to localhost on the host machine
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      # Define your API keys here
-      # - OPENAI_API_KEY=your-key
-      # - GEMINI_API_KEY=your-key
-      # - ANTHROPIC_API_KEY=your-key
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_SRD_MODEL=llama3.2
+      - OLLAMA_JUDGE_MODEL=llama3.2
+      - OLLAMA_ROUTING_MODEL=llama3.2
     volumes:
       - ./compliance_middleware.db:/app/compliance_middleware.db
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ollama
+
+volumes:
+  ollama_data:
