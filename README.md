@@ -91,3 +91,8 @@ Once running, you can access the interactive UI and the API Documentation:
 - **SQLAlchemy & SQLite** (Immutable Audit Logging)
 - **Vanilla HTML/CSS/JS** (Projector-optimized UI Dashboard)
 - **Docker** (Containerization)
+
+<img width="2528" height="1684" alt="Gemini_Generated_Image_ojggq3ojggq3ojgg" src="https://github.com/user-attachments/assets/12918183-ec70-485e-94a3-50c675e4b03b" />
+<img width="2816" height="1536" alt="Gemini_Generated_Image_7xj56v7xj56v7xj5" src="https://github.com/user-attachments/assets/32d8d0c4-c9ca-48aa-a8a2-0d9371542439" />
+
+
