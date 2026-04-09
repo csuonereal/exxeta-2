@@ -42,7 +42,11 @@ class OrchestratorService:
         yield format_event("srd_done", "SRD Detection Complete", f"Found {srd_count} tracking entities.")
         
         # 3. Context Abstraction
+        yield format_event("abstract", "Abstracting Entities...", "")
         abstracted_text, mapping = AbstractorService.abstract_text(raw_text, entities)
+        
+        masked_details = ", ".join([v for k, v in mapping.items()]) if mapping else "None detected."
+        yield format_event("abstract_done", "Anonymizing Privacy Data", f"Instances removed & abstracted: {masked_details}")
         
         # 4. Policy & Routing
         risk_level, route_decision, explanation = PolicyRouterService.evaluate_route(srd_count, raw_req.task or "")

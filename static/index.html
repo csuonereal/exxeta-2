@@ -13,8 +13,8 @@
     <div id="authScreen" class="auth-layout">
         <div class="auth-glass glass-panel">
             <div class="auth-header">
-                <span class="shield-icon" style="font-size:3.5rem;">💠</span>
-                <h1>SecureBank <span>OS Workspace</span></h1>
+                <img src="/logo.png" alt="Logo" style="height: 48px; object-fit: contain; margin-bottom: 10px;">
+                <h1>KeepItPrivate <span>OS</span></h1>
                 <p>Select your assigned persona profile to log in</p>
             </div>
             <div class="persona-cards">
@@ -40,7 +40,7 @@
             
             <div class="auth-form-mock">
                 <span>Or sign in with SSO</span>
-                <input type="email" placeholder="name@securebank.com" disabled>
+                <input type="email" placeholder="name@keepitprivate.com" disabled>
                 <button disabled>Continue with SAML</button>
             </div>
         </div>
@@ -52,9 +52,9 @@
         
         <!-- TOP NAV BAR -->
         <nav class="top-nav glass-panel">
-            <div class="nav-left">
-                <span class="shield-icon">💠</span> 
-                <h2>SecureBank <span>OS</span></h2>
+            <div class="nav-left" style="display:flex; align-items:center;">
+                <img src="/logo.png" alt="Logo" style="height: 24px; object-fit: contain; margin-right: 10px;">
+                <h2 style="margin:0;">KeepItPrivate <span>OS</span></h2>
             </div>
             <div class="nav-center">
                 <input type="text" class="search-bar" placeholder="Search enterprise directories...">
@@ -82,7 +82,7 @@
                 <aside class="file-explorer glass-panel">
                     <div class="explorer-header">
                         <h3>WORKSPACE</h3>
-                        <button id="addFileBtn" class="icon-btn admin-only" title="New File">＋</button>
+                        <button id="addFileBtn" class="icon-btn" title="Create New File">＋</button>
                     </div>
                     <div class="explorer-label" id="explorerViewLabel">Local Drive</div>
                     <!-- DRAG N DROP FILE LIST -->
@@ -96,11 +96,14 @@
                             <span class="file-icon">📄</span>
                             <input type="text" id="editorTitleInput" readonly>
                         </div>
-                        <button id="deleteFileBtn" class="icon-btn danger-btn admin-only" title="Delete File" style="display:none;">🗑️</button>
+                        <button id="deleteFileBtn" class="icon-btn danger-btn" title="Delete File" style="display:none;">🗑️</button>
                     </div>
                     
                     <div class="editor-content">
                         <textarea id="mainEditor" spellcheck="false" placeholder="Select a file to view..."></textarea>
+                        
+                        <!-- Interactive Log Viewer for Admin -->
+                        <div id="logViewer" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; padding:20px; overflow-y:auto; background:white; z-index:2; flex-direction:column; gap:10px;"></div>
                     </div>
 
                     <!-- Proposed Edit Overlay -->
@@ -117,14 +120,65 @@
                         </div>
                     </div>
                 </main>
+                
+                <!-- GOVERNANCE SETTINGS CONSOLE -->
+                <div id="settingsConsole" class="glass-panel" style="display:none; flex-grow:1; flex-direction:column; padding:30px; overflow-y:auto; position: absolute; left: 63px; top: 15px; bottom: 15px; right: 415px; z-index: 10;">
+                    <div style="border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom:15px; margin-bottom:20px;">
+                        <h2 style="font-family:'Outfit', sans-serif; font-weight:700; color:var(--text-primary);">🛡️ Model Governance & Policy Configuration</h2>
+                        <p style="color:var(--text-secondary); font-size:0.85rem;">Enforce enterprise-wide compliance models across all user interactions.</p>
+                    </div>
+                    
+                    <div style="display:flex; flex-direction:column; gap:25px;">
+                        <!-- Core Engines -->
+                        <div style="background:rgba(255,255,255,0.5); padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+                            <h3 style="font-size:1rem; margin-bottom:15px; color:#334155;">Internal Policy Engines (Hidden from Users)</h3>
+                            
+                            <div style="display:flex; flex-direction:column; gap:15px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <b style="font-size:0.9rem;">Primary Routing LLM (Traffic Cop)</b>
+                                        <div style="font-size:0.75rem; color:var(--text-secondary);">Decides if a query triggers SRD constraints</div>
+                                    </div>
+                                    <select class="model-dropdown" style="padding:6px; width:200px; font-size:0.8rem;">
+                                        <option>Ollama (Llama-3-8b)</option>
+                                        <option>Mistral-Nemo (Local)</option>
+                                        <option>Phi-3 (Local)</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <b style="font-size:0.9rem;">Final Judge LLM (Evaluator)</b>
+                                        <div style="font-size:0.75rem; color:var(--text-secondary);">Grades output for hallucination & risk</div>
+                                    </div>
+                                    <select class="model-dropdown" style="padding:6px; width:200px; font-size:0.8rem;">
+                                        <option>Ollama (Llama-3-8b)</option>
+                                        <option>Cohere Command-R (API)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User Allowlist -->
+                        <div style="background:rgba(255,255,255,0.5); padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+                            <h3 style="font-size:1rem; margin-bottom:15px; color:#334155;">Permitted Employee Base Models</h3>
+                            <div style="display:flex; flex-direction:column; gap:10px; font-size:0.85rem;">
+                                <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" checked disabled> Local Engine (Force Permitted)</label>
+                                <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" checked> OpenAI (GPT-4o) - High Risk</label>
+                                <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" checked> Google Gemini 1.5 - High Risk</label>
+                                <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" checked> Anthropic Claude 3.5 - High Risk</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- AGENT SIDEBAR -->
             <aside class="chat-sidebar glass-panel">
                 <header>
-                    <div class="logo">
-                        <span class="shield-icon">🛡️</span> 
-                        <h1>Compliance <span>AI</span></h1>
+                    <div class="logo" style="display:flex; align-items:center;">
+                        <img src="/logo.png" alt="Logo" style="height: 28px; object-fit: contain; border-radius: 4px; margin-right: 8px;">
+                        <h1 style="margin:0; display:flex; align-items:center;">Eli <span style="margin-left:5px;">(Agent)</span></h1>
                     </div>
                     <div class="status-badge" title="Live Pipeline Active">Live</div>
                 </header>
@@ -137,18 +191,20 @@
                 <div class="chat-input-wrapper" id="dropZone">
                     
                     <!-- Advanced Controls (Model & Audio selection) -->
-                    <div class="chat-controls" id="adminAgentControls">
+                    <div class="chat-controls" id="adminAgentControls" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:8px;">
                         <div style="display:flex; align-items:center; gap:4px;">
                             <select id="modelSelect" class="model-dropdown">
                                 <!-- Populated dynamically by app.js based on role -->
                             </select>
                             <button id="addProviderBtn" class="admin-only" title="Add new custom provider" style="cursor:pointer; border:none; background:transparent; font-size:1.1rem; color:var(--text-secondary);">⚙️</button>
                         </div>
-                        <select id="voiceSelect" class="model-dropdown admin-only">
-                            <option value="local">Voice: Local (Whisper)</option>
-                            <option value="elevenlabs">Voice: ElevenLabs API</option>
-                            <option value="openai_tts">Voice: OpenAI TTS</option>
-                        </select>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <select id="voiceSelect" class="model-dropdown admin-only">
+                                <option value="mistral">Voice: Mistral (Voxtral Audio)</option>
+                                <option value="elevenlabs">Voice: ElevenLabs (Proprietary)</option>
+                            </select>
+                            <button id="clearChatContextBtn" title="Clear Workspace Context" style="font-size:0.75rem; color:var(--text-secondary); background:var(--surface); border:1px solid var(--border-color); border-radius:8px; padding:4px 8px; cursor:pointer;">🚫 Drop Context</button>
+                        </div>
                     </div>
 
                     <!-- Explicit Attachment Display -->

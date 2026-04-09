@@ -18,15 +18,15 @@ document.addEventListener("DOMContentLoaded", () => {
         modelSelect.innerHTML = ""; // Clear options
 
         if (role === 'admin') {
-            navPersonaDisplay.innerHTML = "<b>Alex (Compliance Officer)</b>";
+            navPersonaDisplay.innerHTML = "<b>Alex</b>";
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = "flex");
             document.querySelectorAll('.standard-only').forEach(el => el.style.display = "none");
             
             // Give Admin full provider list plus capability to add new ones
             modelSelect.innerHTML = `
                 <option value="auto">LLM: Auto (Risk-based)</option>
+                <option value="gemini" selected>LLM: Gemini (Secure API)</option>
                 <option value="openai">LLM: OpenAI (Secure API)</option>
-                <option value="gemini">LLM: Gemini (Secure API)</option>
                 <option value="local">LLM: Local (Ollama GPU)</option>
             `;
             // Quick mock event listener for adding provider
@@ -40,17 +40,29 @@ document.addEventListener("DOMContentLoaded", () => {
             };
             
         } else {
-            navPersonaDisplay.innerHTML = "<b>Jordan (Sales Rep)</b>";
+            navPersonaDisplay.innerHTML = "<b>Jordan</b>";
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = "none");
             document.querySelectorAll('.standard-only').forEach(el => el.style.display = "block");
             
-            // Standard User only sees heavily restricted, pre-approved safe options
+            // Standard User sees typical models. They do not know a router intercepts them if SRDs are found.
             modelSelect.innerHTML = `
-                <option value="auto">LLM: Verified Auto-Router</option>
-                <option value="local">LLM: Internal Safe-Local</option>
+                <option value="gemini" selected>LLM: Google Gemini</option>
+                <option value="openai">LLM: OpenAI</option>
+                <option value="anthropic">LLM: Anthropic</option>
+                <option value="local">LLM: Local Engine</option>
             `;
+            
+            // Clean state to ensure Admin-only files are not unintentionally leaked upon logout
+            if (activeFileName === "SYSTEM_Intercept_Logs.json") {
+                activeFileName = "Q3_Variance_Report.txt";
+            }
         }
         
+        if (typeof renderFileList === "function") {
+            document.getElementById('settingsConsole').style.display = 'none';
+            renderFileList();
+            loadEditor();
+        }
         setTimeout(() => mainEditor.focus(), 100);
     };
 
@@ -72,7 +84,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const MOCK_WORKSPACE_FILES = {
         "Q3_Variance_Report.txt": "EU Branch financial variance report. Net profit fell 4% primarily due to undisclosed leak by Michael Bolton (michael.bolton@securebank.com - SSN 000-00-0000). Total market liability currently assessed at $4.2M.",
         "GDPR_Deletion_Log.csv": "RequestID,Name,Email,Status\n1001,Jane Doe,jane@doe.com,Pending\n1002,John Smith,jsmith@corp.net,Completed",
-        "Memo_ProjectPhoenix.txt": "Project strictly confidential. Do not forward. Send updates to compliance-team@corp.com immediately."
+        "Memo_ProjectPhoenix.txt": "Project strictly confidential. Do not forward. Send updates to compliance-team@corp.com immediately.",
+        "SYSTEM_Intercept_Logs.json": '[\n  {"timestamp": "2024-04-09 08:32:15", "user": "Jordan (Sales Rep)", "target_model": "OpenAI (Secure API)", "file": "Q3_Variance_Report.txt", "action": "BLOCKED & REROUTED", "srd_count": 3, "entities": ["Michael Bolton (PERSON)", "michael.bolton@securebank.com (EMAIL)", "000-00-0000 (FINANCE)"]},\n  {"timestamp": "2024-04-09 09:12:05", "user": "Jordan (Sales Rep)", "target_model": "Gemini (Secure API)", "file": "GDPR_Deletion_Log.csv", "action": "BLOCKED & REROUTED", "srd_count": 4, "entities": ["Jane Doe (PERSON)", "jane@doe.com (EMAIL)"]}\n]'
     };
 
     const MOCK_WORKSPACE_EMAILS = {
@@ -81,20 +94,44 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     let currentView = "files"; // 'files' or 'emails'
-    let activeFileName = "Q3_Variance_Report.txt";
+    let activeFileName = null; // Zero context by default
 
     function getActiveMap() { return currentView === 'files' ? MOCK_WORKSPACE_FILES : MOCK_WORKSPACE_EMAILS; }
+
+    function renderLogViewer(logsArray) {
+        const viewer = document.getElementById('logViewer');
+        viewer.innerHTML = `<h3>🛡️ SRD Intercept & Enforcement Logs</h3><p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:10px;">Showing policy routing records for the current session.</p>`;
+        
+        logsArray.forEach(log => {
+            const row = document.createElement('div');
+            row.style = "border: 1px solid #cbd5e1; border-radius:8px; padding:12px; font-size:0.85rem; display:flex; flex-direction:column; gap:5px; background:rgba(239, 68, 68, 0.05);";
+            row.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="color:var(--text-primary);">${log.file}</b>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">${log.timestamp}</span>
+                </div>
+                <div>User <b>${log.user}</b> requested execution on <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px;">${log.target_model}</span></div>
+                <div style="color:var(--danger); font-weight:600;">⚠️ ${log.action} - ${log.srd_count} SRDs Detected</div>
+                <div style="font-family:'Fira Code', monospace; font-size:0.7rem; color:#065f46; background:rgba(16, 185, 129, 0.1); padding:4px 8px; border-radius:4px; margin-top:5px;">
+                    Masked: ${log.entities.join(", ")}
+                </div>
+            `;
+            viewer.appendChild(row);
+        });
+    }
 
     function renderFileList() {
         fileListEl.innerHTML = "";
         const dataMap = getActiveMap();
         Object.keys(dataMap).forEach(fileName => {
+            // Hide Admin system files from standard users
+            if (fileName.startsWith("SYSTEM_") && currentPersona !== "admin") return;
+
             const li = document.createElement('li');
             li.className = `file-item ${fileName === activeFileName ? 'active' : ''}`;
             const icon = currentView === 'files' ? '📄' : '✉️';
             li.innerHTML = `${icon} <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;">${fileName}</span>`;
             
-            // Allow drag and drop of files directly from workspace list
             li.draggable = true;
             li.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'workspace_file', name: fileName, view: currentView }));
@@ -102,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             li.addEventListener('click', () => {
-                if (activeFileName && getActiveMap().hasOwnProperty(activeFileName)) {
+                if (activeFileName && getActiveMap().hasOwnProperty(activeFileName) && document.getElementById('logViewer').style.display === "none") {
                     getActiveMap()[activeFileName] = mainEditor.value;
                 }
                 activeFileName = fileName;
@@ -115,19 +152,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function loadEditor() {
         const dataMap = getActiveMap();
+        const viewer = document.getElementById('logViewer');
+        
         if (activeFileName && dataMap.hasOwnProperty(activeFileName)) {
             editorTitleInput.value = activeFileName;
-            mainEditor.value = dataMap[activeFileName];
             
-            // Restrict editing depending on Persona rules mock (Sales rep can't edit compliance finals)
-            const canEdit = currentPersona === 'admin' || currentView === 'emails';
-            mainEditor.disabled = !canEdit;
-            editorTitleInput.disabled = !canEdit;
+            // Check if it's the structured logfile
+            if (activeFileName === "SYSTEM_Intercept_Logs.json") {
+                mainEditor.style.display = "none";
+                viewer.style.display = "flex";
+                editorTitleInput.disabled = true;
+                deleteFileBtn.style.display = "none";
+                try {
+                    renderLogViewer(JSON.parse(dataMap[activeFileName]));
+                } catch(e) { viewer.innerHTML = "Corrupt Log File"; }
+            } else {
+                mainEditor.style.display = "block";
+                viewer.style.display = "none";
+                mainEditor.value = dataMap[activeFileName];
+                
+                const canEdit = currentPersona === 'admin' || currentView === 'emails';
+                mainEditor.disabled = !canEdit;
+                editorTitleInput.disabled = !canEdit;
+                deleteFileBtn.style.display = "block";
+            }
             
-            deleteFileBtn.style.display = currentPersona === 'admin' ? "block" : "none";
             document.querySelector('.editor-title .file-icon').innerText = currentView === 'files' ? '📄' : '✉️';
-            
-            // clear overlays
             document.getElementById("proposalOverlay").style.display = "none";
         } else {
             editorTitleInput.value = "";
@@ -135,27 +185,42 @@ document.addEventListener("DOMContentLoaded", () => {
             mainEditor.disabled = true;
             editorTitleInput.disabled = true;
             deleteFileBtn.style.display = "none";
+            viewer.style.display = "none";
+            mainEditor.style.display = "block";
         }
     }
 
     // Activity Bar Switching
     activityBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            if(e.currentTarget.title === "Settings" || e.currentTarget.title === "Model Configuration") return;
+            const title = e.currentTarget.title;
+            const settingsConsole = document.getElementById('settingsConsole');
+            
             activityBtns.forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
+            
+            if(title === "Model Configuration") {
+                settingsConsole.style.display = "flex";
+                return;
+            } else if (title === "Settings") {
+                settingsConsole.style.display = "none";
+                alert("General app preferences menu is under construction.");
+                return;
+            } else {
+                settingsConsole.style.display = "none";
+            }
             
             if(activeFileName && getActiveMap().hasOwnProperty(activeFileName)) {
                 getActiveMap()[activeFileName] = mainEditor.value;
             }
 
-            if(e.currentTarget.title === "Local Drive") {
+            if(title === "Local Drive") {
                 currentView = "files";
-                activeFileName = Object.keys(MOCK_WORKSPACE_FILES)[0] || null;
+                activeFileName = null;
                 explorerViewLabel.innerText = "Local Drive";
             } else {
                 currentView = "emails";
-                activeFileName = Object.keys(MOCK_WORKSPACE_EMAILS)[0] || null;
+                activeFileName = null;
                 explorerViewLabel.innerText = "Email Inbox";
             }
             renderFileList();
@@ -182,13 +247,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     addFileBtn.addEventListener('click', () => {
-        const fallbackName = currentView === 'files' ? `NewFile_${Date.now()}.txt` : `Draft_${Date.now()}`;
-        getActiveMap()[fallbackName] = "";
-        activeFileName = fallbackName;
+        const defaultName = currentView === 'files' ? `NewFile_${Date.now()}.txt` : `Draft_${Date.now()}`;
+        const newFileName = prompt("Enter a name for the new file:", defaultName);
+        if (!newFileName || newFileName.trim() === "") return;
+        
+        const finalName = newFileName.trim();
+        if(!getActiveMap().hasOwnProperty(finalName)) {
+            getActiveMap()[finalName] = "";
+        }
+        activeFileName = finalName;
         renderFileList();
         loadEditor();
         mainEditor.focus();
     });
+
+    const deselectFileBtn = document.getElementById('deselectFileBtn');
+    if (deselectFileBtn) {
+        deselectFileBtn.addEventListener('click', () => {
+            if (activeFileName && getActiveMap().hasOwnProperty(activeFileName)) {
+                // save current
+                getActiveMap()[activeFileName] = mainEditor.value;
+            }
+            activeFileName = null; // empty context
+            renderFileList();
+            loadEditor();
+        });
+    }
 
     deleteFileBtn.addEventListener('click', () => {
         if (activeFileName) {
@@ -224,10 +308,81 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentBase64File = null;
     let currentFileName = null;
 
-    // MIC UX MOCK
-    micBtn.addEventListener('mousedown', () => { micBtn.classList.add('listening'); chatInput.placeholder = "Listening... (Release to stop)"; });
-    micBtn.addEventListener('mouseup', () => { micBtn.classList.remove('listening'); chatInput.placeholder = "Ask AI... (Drop files from workspace here)"; chatInput.value += " [Voice dictation active]"; });
-    micBtn.addEventListener('mouseleave', () => { micBtn.classList.remove('listening'); chatInput.placeholder = "Ask AI... (Drop files from workspace here)";});
+    // SERVER-BACKED AUDIO RECORDING (DICTATION) -> /api/audio/stt
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isMicInitializing = false;
+    let recordStartTime = 0;
+
+    const stopRecordingCleanly = () => {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+        }
+    };
+
+    micBtn.addEventListener('mousedown', async (e) => { 
+        if (e.button !== 0) return; // ignore right clicks
+        if (isMicInitializing || (mediaRecorder && mediaRecorder.state === "recording")) return;
+        
+        isMicInitializing = true;
+        
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    micBtn.classList.remove('listening');
+                    chatInput.placeholder = "Processing audio...";
+                    
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const recordDuration = Date.now() - recordStartTime;
+                    
+                    // Guard against 0-second misclicks or tiny headers
+                    if (recordDuration < 600 || audioBlob.size < 1000) {
+                        chatInput.placeholder = "Ask AI... (Drop files from workspace here)";
+                        stream.getTracks().forEach(track => track.stop());
+                        return;
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append("audio", audioBlob, "dictation.webm");
+                    
+                    try {
+                        const response = await fetch('/api/audio/stt', { method: 'POST', body: formData });
+                        const result = await response.json();
+                        if (result.transcript) {
+                            chatInput.value += (chatInput.value ? " " : "") + result.transcript;
+                            chatInput.dispatchEvent(new Event('input'));
+                        } else if (result.detail) {
+                            alert("Audio API Error: " + result.detail);
+                        }
+                    } catch (err) {
+                        alert("Dictation Error. Ensure API keys are active.");
+                    }
+                    chatInput.placeholder = "Ask AI... (Drop files from workspace here)";
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                recordStartTime = Date.now();
+                mediaRecorder.start();
+                micBtn.classList.add('listening'); 
+                chatInput.placeholder = "Recording... (Release to Stop)";
+            } catch(err) {
+                alert("Microphone permission denied or unavailable.");
+            } finally {
+                isMicInitializing = false;
+            }
+        }
+    });
+
+    micBtn.addEventListener('mouseup', stopRecordingCleanly);
+    micBtn.addEventListener('mouseleave', stopRecordingCleanly);
 
     // DRAG AND DROP LOGIC (Mix OS Native and Browser Native)
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -285,6 +440,17 @@ document.addEventListener("DOMContentLoaded", () => {
         attachmentPreview.style.display = "none";
     });
 
+    const clearChatContextBtn = document.getElementById('clearChatContextBtn');
+    if(clearChatContextBtn) {
+        clearChatContextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            activeFileName = null;
+            renderFileList();
+            loadEditor();
+            chatInput.placeholder = "Ask AI... (Zero context. Drop files here if needed)";
+        });
+    }
+
     // Auto-resize textarea
     chatInput.addEventListener('input', function() {
         this.style.height = 'auto';
@@ -334,6 +500,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const appendPipelineStep = (container, stepData) => {
         if (stepData.step === "hash") return;
+        
+        // Hide internal compliance logic completely from standard users
+        if (currentPersona !== 'admin' && ["srd", "srd_done", "abstract", "abstract_done", "route", "reinject", "judge"].includes(stepData.step)) {
+            return;
+        }
 
         const stepWrapper = document.createElement('div');
         stepWrapper.style.display = "flex";
@@ -344,8 +515,10 @@ document.addEventListener("DOMContentLoaded", () => {
         
         let icon = "⚙️";
         if (stepData.step === "srd" || stepData.step === "srd_done") icon = "🔍";
+        if (stepData.step.includes("abstract")) icon = "🔒";
         if (stepData.step === "route") icon = "🚦";
         if (stepData.step === "model") icon = "🧠";
+        if (stepData.step === "reinject") icon = "🔓";
         if (stepData.step === "judge") icon = "⚖️";
 
         const hasDetails = !!stepData.details;
@@ -376,10 +549,10 @@ document.addEventListener("DOMContentLoaded", () => {
         let outputText = finalData.output;
         
         // --- ADAPTIVE OUTPUT EDIT EXTRACTION ---
-        const editRegex = /<EDIT_PROPOSAL>([\s\S]*?)<\/EDIT_PROPOSAL>/i;
+        const editRegex = /<EDIT_PROPOSAL>([\s\S]*?)(?:<\/EDIT_PROPOSAL>|$)/i;
         const match = editRegex.exec(outputText);
         
-        if (match && currentPersona === 'admin') {
+        if (match) {
             const proposedEdit = match[1].trim();
             outputText = outputText.replace(editRegex, "").trim();
             if (!outputText) outputText = "✨ I generated a proposed draft based on your instructions. Please review it in your active workspace!";
@@ -396,13 +569,15 @@ document.addEventListener("DOMContentLoaded", () => {
             const onAccept = () => {
                 getActiveMap()[activeFileName] = proposedEdit;
                 mainEditor.value = proposedEdit;
-                mainEditor.disabled = false;
+                const canEdit = currentPersona === 'admin' || currentView === 'emails';
+                mainEditor.disabled = !canEdit;
                 proposalOverlay.style.display = "none";
                 document.getElementById('acceptEditBtn').removeEventListener('click', onAccept);
                 document.getElementById('rejectEditBtn').removeEventListener('click', onReject);
             };
             const onReject = () => {
-                mainEditor.disabled = false;
+                const canEdit = currentPersona === 'admin' || currentView === 'emails';
+                mainEditor.disabled = !canEdit;
                 proposalOverlay.style.display = "none";
                 document.getElementById('acceptEditBtn').removeEventListener('click', onAccept);
                 document.getElementById('rejectEditBtn').removeEventListener('click', onReject);
@@ -434,10 +609,63 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch(err) {}
             });
         });
+        
+        // Audio Read Aloud Capability (Backend API TTS)
+        const readAloudBtn = document.createElement('button');
+        readAloudBtn.className = "feedback-btn";
+        readAloudBtn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
+        readAloudBtn.title = "Generate Audio Response";
+        readAloudBtn.style.marginRight = "auto"; 
+        
+        let currentAudio = null;
+        
+        readAloudBtn.onclick = async (e) => {
+            const btn = e.currentTarget;
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
+                btn.style.color = "inherit";
+                return;
+            }
+            
+            btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Loading...</span>`;
+            
+            try {
+                const formData = new FormData();
+                formData.append("text", outputText);
+                
+                const voiceSelect = document.getElementById('voiceSelect');
+                const provider = voiceSelect ? voiceSelect.value : "mistral";
+                formData.append("provider", provider); 
+                
+                const response = await fetch('/api/audio/tts', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const r = await response.json();
+                    throw new Error(r.detail || "API Failure");
+                }
+                
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                currentAudio = new Audio(url);
+                currentAudio.onended = () => {
+                    btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
+                    btn.style.color = "inherit";
+                    currentAudio = null;
+                };
+                
+                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Playing...</span>`;
+                btn.style.color = "var(--accent)";
+                currentAudio.play();
+                
+            } catch(err) {
+                alert("TTS Error: " + err.message);
+                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
+            }
+        };
+        widgetWrapper.querySelector('.feedback-actions').prepend(readAloudBtn);
 
-        if (currentPersona === 'admin') {
-            messageDiv.querySelector('.bubble').appendChild(widgetWrapper);
-        }
+        messageDiv.querySelector('.bubble').appendChild(widgetWrapper);
         scrollToBottom();
     };
 

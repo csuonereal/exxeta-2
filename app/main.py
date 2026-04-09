@@ -41,7 +41,8 @@ os.makedirs("static", exist_ok=True)
 async def health_check():
     return {"status": "ok", "middleware": "active"}
 
+from app.api.audio import router as audio_router
 app.include_router(api_router)
-
+app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
 # Mount static folder AFTER all other routes so they aren't overridden
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

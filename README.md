@@ -59,9 +59,10 @@ uvicorn app.main:app --reload
 ```
 
 ### 4. Running via Docker
-A `docker-compose.yml` is provided for containerized web hosting that communicates securely to your host machine's Ollama runner to maintain GPU acceleration.
+A `docker-compose.yml` is provided: it runs **Ollama** and the **middleware** together. SQLite audit data is stored in the named Docker volume `middleware_data` (not bind-mounted as a single file, so SQLite can always create/open the database).
+
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 ---

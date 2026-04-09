@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ollama:
     image: ollama/ollama:latest
@@ -17,10 +15,13 @@ services:
       - OLLAMA_SRD_MODEL=llama3.2
       - OLLAMA_JUDGE_MODEL=llama3.2
       - OLLAMA_ROUTING_MODEL=llama3.2
+      # SQLite on a writable dir (avoid bind-mounting a single file: missing host path → dir → sqlite fails)
+      - DATABASE_URL=sqlite:////app/data/compliance_middleware.db
     volumes:
-      - ./compliance_middleware.db:/app/compliance_middleware.db
+      - middleware_data:/app/data
     depends_on:
       - ollama
 
 volumes:
   ollama_data:
+  middleware_data:
