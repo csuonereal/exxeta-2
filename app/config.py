@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env file if it exists and override system envs so it hot-reloads properly
-load_dotenv(override=True)
+# Do not override existing env vars — Docker Compose / K8s must win over a local .env file.
+load_dotenv(override=False)
 
 class Config:
     # Model APIs
