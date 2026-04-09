@@ -3,55 +3,52 @@ import json
 from app.config import config
 import re
 
+# We install presidio_analyzer, catching imports gracefully to not crash if uninstalled yet
+try:
+    from presidio_analyzer import AnalyzerEngine
+except ImportError:
+    AnalyzerEngine = None
+
+# Singleton to prevent massive loading lags on every API hit
+_analyzer_engine = None
+
 class SRDDetectorService:
     def __init__(self):
-        self.host = config.OLLAMA_HOST
-        self.model = config.OLLAMA_SRD_MODEL
+        global _analyzer_engine
+        if AnalyzerEngine and _analyzer_engine is None:
+            _analyzer_engine = AnalyzerEngine()
+        self.analyzer = _analyzer_engine
 
     async def detect_entities(self, text: str) -> list[dict]:
-        # Direct regex for common patterns as a fallback/fast-path
-        # But per requirements, use local LLM mapping if possible, or rule-based.
-        # For this MVP, we prompt Ollama to give us a JSON of entities.
-        
-        prompt = f"""
-        Identify Sensitive Regulated Data (SRD) in the following text. 
-        Focus strictly on: Names of people (PERSON), Organizations (ORG), Emails (EMAIL), and Financial Data (FINANCE).
-        Output ONLY a valid JSON list of objects, where each object has 'value' (the exact text snippet) and 'type' (the category). Do not write ANY markdown formatting.
-        Example: [{{"value": "John Doe", "type": "PERSON"}}]
-
-        Text:
-        {text}
-        """
-
-        try:
-            async with httpx.AsyncClient() as client:
-                res = await client.post(
-                    f"{self.host}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "format": "json"
-                    },
-                    timeout=60.0
+        # If Presidio installed correctly, leverage it
+        if self.analyzer:
+            try:
+                results = self.analyzer.analyze(
+                    text=text,
+                    entities=["PERSON", "CREDIT_CARD", "US_BANK_NUMBER", "PHONE_NUMBER", "EMAIL_ADDRESS", "US_SSN", "DATE_TIME"],
+                    language="en"
                 )
-                if res.status_code == 200:
-                    response_text = res.json().get("response", "[]")
-                    # In case LLM returns markdown blocks
-                    clean_text = re.sub(r'```json|```', '', response_text).strip()
-                    try:
-                        entities = json.loads(clean_text)
-                        if isinstance(entities, list):
-                            return entities
-                        elif isinstance(entities, dict) and "srd_entities" in entities:
-                            return entities["srd_entities"]
-                    except json.JSONDecodeError as de:
-                        print(f"JSON Parse error. Raw output: {clean_text}")
-        except Exception as e:
-            print(f"SRD Detection local LLM failed, fallback to rules: {str(e)}")
-            pass
-        
-        # Fallback to regex if LLM fails or is slow
+                
+                entities = []
+                for res in results:
+                    entity_value = text[res.start:res.end]
+                    # Map to generic tags so our Abstractor/Reinjector doesn't break
+                    etype = res.entity_type
+                    if etype == "EMAIL_ADDRESS":
+                        etype = "EMAIL"
+                    elif etype in ["CREDIT_CARD", "US_BANK_NUMBER", "US_SSN"]:
+                        etype = "FINANCE"
+                        
+                    entities.append({
+                        "value": entity_value,
+                        "type": etype,
+                    })
+                return entities
+
+            except Exception as e:
+                print(f"Presidio crash, fallback rules: {str(e)}")
+
+        # Hard Fallback
         return self._regex_fallback(text)
         
     def _regex_fallback(self, text: str) -> list[dict]:
