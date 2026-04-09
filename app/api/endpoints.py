@@ -47,6 +47,8 @@ async def process_task(request: ProcessRequest):
                     finally:
                         db.close()
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             # Yield error event
             yield f"data: {json.dumps({'step': 'error', 'message': str(e)})}\n\n"
 
