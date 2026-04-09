@@ -56,7 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (activeFileName === "SYSTEM_Intercept_Logs.json") {
                 activeFileName = "Q3_Variance_Report.txt";
             }
-        }
         
         if (typeof renderFileList === "function") {
             document.getElementById('settingsConsole').style.display = 'none';
@@ -609,18 +608,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch(err) {}
             });
         });
-        
-                
-                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Playing...</span>`;
-                btn.style.color = "var(--accent)";
-                currentAudio.play();
-                
-            } catch(err) {
-                alert("TTS Error: " + err.message);
-                btn.innerHTML = `🔊 <span style="font-size:0.7rem; font-weight:600;">Play</span>`;
-            }
-        };
-        widgetWrapper.querySelector('.feedback-actions').prepend(readAloudBtn);
 
         messageDiv.querySelector('.bubble').appendChild(widgetWrapper);
         scrollToBottom();
